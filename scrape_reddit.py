@@ -177,6 +177,8 @@ def main():
     data_dir = "data/202604_21-28/"
     output_data_dir = "data/outputs/202404_21-28/"
     all_jsonl_paths = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".jsonl")]
+    # Sort files by date (assuming the date is in the filename as output_YYYYMMDD.jsonl)
+    all_jsonl_paths.sort(key=lambda x: os.path.basename(x).split("_")[1].split(".")[0])
 
     # Setup reddit client
     reddit = setup_reddit_client()
@@ -205,7 +207,7 @@ def main():
         # Remove zazzom
         df = df[df["MentionSourceName"] != "zazoom.it"].reset_index(drop=True)
 
-        df[date] = [date] * len(df)
+        df['date'] = [date] * len(df)
         df['date'] = pd.to_datetime(df['date'])
         # Clean urls
         df['clean_urls'] = df['MentionIdentifier'].apply(normalize_url)
