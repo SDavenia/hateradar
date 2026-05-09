@@ -1,0 +1,10 @@
+# Notebooks for testing
+view.ipynb
+find_subreddits.ipynb
+reddit_scraper_test.ipynb
+
+# Tests
+test_articles.csv
+
+# env
+.env
