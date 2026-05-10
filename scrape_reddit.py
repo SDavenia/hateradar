@@ -58,8 +58,6 @@ def search_subreddits(
                     )
                     results.append(submission)
                 success = True
-                # # added a small pause between normal requests to try and avoid the rate limit
-                # time.sleep(2)
                 break 
 
             except TooManyRequests as e:
@@ -68,7 +66,7 @@ def search_subreddits(
                 if retry_after is not None:
                     wait_time = retry_after
                 else:
-                    wait_time = base_sleep * (2 ** attempt) #Maybe too long, see later TODO
+                    wait_time = base_sleep * (2 ** attempt) #Maybe too long, see later TODO -> does not occur that often so should not be a problem.
                 print(
                     f"429 TooManyRequests for {url} "
                     f"(attempt {attempt + 1}/{max_retries}) "
@@ -176,6 +174,9 @@ def main():
     # Load All jsonl files:
     data_dir = "data/202604_21-28/"
     output_data_dir = "data/outputs/202404_21-28/"
+    # Create output directory if it doesn't exist
+    os.makedirs(output_data_dir, exist_ok=True)
+    
     all_jsonl_paths = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".jsonl")]
     # Sort files by date (assuming the date is in the filename as output_YYYYMMDD.jsonl)
     all_jsonl_paths.sort(key=lambda x: os.path.basename(x).split("_")[1].split(".")[0])
@@ -242,7 +243,6 @@ def main():
                 enriched_submission["Text"] = matching_rows["Text"].tolist()[0]
 
             enriched_results.append(enriched_submission)
-
         with open(output_path, "w") as f:
             for item in enriched_results:
                 f.write(json.dumps(item) + "\n")
