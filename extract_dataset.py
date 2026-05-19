@@ -4,6 +4,29 @@ from glob import glob
 import pandas as pd
 import re
 
+
+"""
+Processes Reddit post data from JSONL files into a flat pandas DataFrame.
+
+considered keys: 
+post
+dict_keys(['id', 'subreddit', 'permalink', 'created_utc', 'author', 'title', 'selftext', 'url', 'comment'])
+
+comment
+dict_keys(['id', 'author', 'body', 'score', 'created_utc', 'replies'])
+
+
+Each row represents a single comment (or a post with no comments).
+Replies are recursively disaggregated, preserving thread structure via:
+- comment_level: depth of the comment (0 = top-level, 1 = reply, 2 = reply to reply, ...)
+- parent_id:     id of the comment being replied to (None for top-level comments)
+- thread_id:     id of the root comment of the thread
+
+Posts with no comments are kept as a single row with all comment fields set to None.
+Source file date is extracted from the filename and added as a column.
+"""
+
+
 dir_reddit = './data/outputs/202404_21-28/'
 rows = []
 post_ids = list()
