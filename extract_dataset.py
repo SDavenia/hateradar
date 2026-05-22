@@ -94,7 +94,7 @@ for file in glob(os.path.join(dir_reddit, '*.jsonl')):
 df = pd.DataFrame(rows)
 
 print(df.shape)
-df.to_csv('./data/dataset/reddit_data.csv', index=False)
+df.to_csv('./data/dataset/posts_and_comments.csv', index=False)
 
 # statistics
 print("Total post IDs from jsonl files:", len(post_ids), "--- Unique:", len(set(post_ids)))
@@ -108,3 +108,12 @@ print("Max comment depth:", df['comment_level'].max())
 for i in df['post_id']:
     if i not in post_ids:
         print(i)
+
+# s = set()
+# dup = []
+# for i in df['post_id'].unique():
+#     if i in s:
+#         dup.append(i)
+#     else:
+#         s.add(i)
+# print(dup)
