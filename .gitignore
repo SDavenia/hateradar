@@ -8,3 +8,5 @@ test_articles.csv
 
 # env
 .env
+.vscode
+try*
