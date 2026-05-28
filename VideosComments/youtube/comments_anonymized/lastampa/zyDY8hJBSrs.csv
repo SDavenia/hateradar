@@ -1,0 +1,3 @@
+comment_id,parent_comment_id,video_id,is_reply,author,published_at,updated_at,like_count,text,inferred_parent_id,depth,newspaper,author_anon
+UgzP9eAICzjKLXVU71h4AaABAg,,zyDY8hJBSrs,False,author_2250,2026-05-26T12:29:37Z,2026-05-26T12:29:37Z,1,In America starebbe già sotto un metro di terra,,0,lastampa,author_2250
+UgzP9eAICzjKLXVU71h4AaABAg.AXGpUl33Pt2AXHGmctyFwH,UgzP9eAICzjKLXVU71h4AaABAg,zyDY8hJBSrs,True,author_1577,2026-05-26T16:36:52Z,2026-05-26T16:36:52Z,0,Un padre così tossicodipendente e malato di mente dovrebbe essere in una struttura idonea per curarlo Non a casa con un bambino,UgzP9eAICzjKLXVU71h4AaABAg,1,lastampa,author_1577

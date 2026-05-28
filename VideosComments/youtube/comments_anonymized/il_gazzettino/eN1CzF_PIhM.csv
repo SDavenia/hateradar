@@ -1,0 +1,4 @@
+comment_id,parent_comment_id,video_id,is_reply,author,published_at,updated_at,like_count,text,inferred_parent_id,depth,newspaper,author_anon
+UgwsBIMhw9x3_iShVOJ4AaABAg,,eN1CzF_PIhM,False,author_4343,2026-05-13T17:55:24Z,2026-05-13T17:55:24Z,4,Hanno fatto male,,0,il_gazzettino,author_4343
+UgyiR32Hl0Rp_oxvAeJ4AaABAg,,eN1CzF_PIhM,False,author_534,2026-05-13T21:26:15Z,2026-05-13T21:26:15Z,0,Furbo,,0,il_gazzettino,author_534
+UgzN58W7jgq4plt8uOp4AaABAg,,eN1CzF_PIhM,False,author_6821,2026-05-14T15:00:36Z,2026-05-14T15:00:36Z,0,Peccato!!,,0,il_gazzettino,author_6821

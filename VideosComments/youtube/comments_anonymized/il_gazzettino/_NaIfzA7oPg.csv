@@ -1,0 +1,4 @@
+comment_id,parent_comment_id,video_id,is_reply,author,published_at,updated_at,like_count,text,inferred_parent_id,depth,newspaper,author_anon
+UgzxG2YsTp4JA1P_xnJ4AaABAg,,_NaIfzA7oPg,False,author_3098,2026-05-19T04:31:07Z,2026-05-19T04:31:07Z,0,"Fare il +13% nei primi 3 mesi dell' anno è come fare lo 0,2% in giugno",,0,il_gazzettino,author_3098
+UgzxG2YsTp4JA1P_xnJ4AaABAg.AWyx9yvhvFQAWz32pS3wCl,UgzxG2YsTp4JA1P_xnJ4AaABAg,_NaIfzA7oPg,True,author_6747,2026-05-19T05:31:19Z,2026-05-19T05:31:19Z,0,Esattamente,UgzxG2YsTp4JA1P_xnJ4AaABAg,1,il_gazzettino,author_6747
+UgxtA8oOdfzjY5ft2MV4AaABAg,,_NaIfzA7oPg,False,author_5131,2026-05-19T07:54:37Z,2026-05-19T07:54:37Z,1,Ladriiiiiiiiiiiii,,0,il_gazzettino,author_5131

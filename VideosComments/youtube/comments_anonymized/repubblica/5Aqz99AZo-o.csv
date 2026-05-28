@@ -1,0 +1,7 @@
+comment_id,parent_comment_id,video_id,is_reply,author,published_at,updated_at,like_count,text,inferred_parent_id,depth,newspaper,author_anon
+UgzXzNlpzsdn1-CU9Zp4AaABAg,,5Aqz99AZo-o,False,author_1410,2026-05-26T11:49:18Z,2026-05-26T11:49:18Z,0,😢,,0,repubblica,author_1410
+Ugz0zF_T3_k2VPqnVO54AaABAg,,5Aqz99AZo-o,False,author_1411,2026-05-26T11:52:21Z,2026-05-26T11:52:21Z,0,😢,,0,repubblica,author_1411
+UgygNgTvu1PI4Yapi7p4AaABAg,,5Aqz99AZo-o,False,author_1412,2026-05-26T12:03:09Z,2026-05-26T12:03:09Z,0,😢🙏🙏🙏🙏🙏,,0,repubblica,author_1412
+UgyvvwaBh4M-UA1ds5d4AaABAg,,5Aqz99AZo-o,False,author_1413,2026-05-26T13:14:26Z,2026-05-26T13:14:26Z,4,In Belgio non esistono i passaggi a livello con sbarra ?,,0,repubblica,author_1413
+UgyulJ2BHjmPVuRJmgR4AaABAg,,5Aqz99AZo-o,False,author_1414,2026-05-26T13:24:03Z,2026-05-26T13:24:03Z,1,Com'è possibile nel 2026 ?,,0,repubblica,author_1414
+UgyulJ2BHjmPVuRJmgR4AaABAg.AXGviOkJpzHAXHcMfSKoBM,UgyulJ2BHjmPVuRJmgR4AaABAg,5Aqz99AZo-o,True,author_1415,2026-05-26T19:54:10Z,2026-05-26T19:54:10Z,0,Vaxxident?,UgyulJ2BHjmPVuRJmgR4AaABAg,1,repubblica,author_1415

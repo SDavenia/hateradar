@@ -1,0 +1,3 @@
+comment_id,parent_comment_id,video_id,is_reply,author,published_at,updated_at,like_count,text,inferred_parent_id,depth,newspaper,author_anon
+UgzPW1eGIuZfBRQb06F4AaABAg,,fnj2VTVnCDU,False,author_6649,2026-05-27T16:05:16Z,2026-05-27T16:05:16Z,2,Ladro pulito,,0,il_gazzettino,author_6649
+UgzPW1eGIuZfBRQb06F4AaABAg.AXJmy1d7piUAXJu6SNL4YX,UgzPW1eGIuZfBRQb06F4AaABAg,fnj2VTVnCDU,True,author_6650,2026-05-27T17:07:43Z,2026-05-27T17:07:43Z,1,😅😅,UgzPW1eGIuZfBRQb06F4AaABAg,1,il_gazzettino,author_6650
