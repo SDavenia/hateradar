@@ -696,8 +696,7 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 
   // filename: original comments filename with _<ann_number> before .csv
   const safeAnn = String(annotatorNumber).replace(/[^A-Za-z0-9_-]/g, '');
-  const base = csvFileName.replace(/\.csv$/i, '');
-  const fname = `${base}_${safeAnn}.csv`;
+  const fname = `csvFileName`;
 
   const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
