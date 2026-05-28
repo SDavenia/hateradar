@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comment Annotation Platform</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Spline+Sans+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
+
+  :root {
+    --ink: #1a1614;
+    --paper: #f4efe6;
+    --paper-2: #ece4d4;
+    --card: #fbf8f1;
+    --rule: #d8cdb8;
+    --accent: #b23a1e;
+    --accent-soft: #d8693f;
+    --muted: #6f6557;
+    --ok: #2f6f4f;
+    --ok-soft: #cfe3d6;
+    --danger: #9e2b1a;
+    --danger-soft: #f0d2cb;
+    --shadow: 0 1px 0 rgba(0,0,0,.04), 0 18px 40px -28px rgba(40,28,18,.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #fbf7ee 0%, transparent 60%),
+      var(--paper);
+    color: var(--ink);
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 17px;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 28px 26px 80px; }
+
+  /* Masthead */
+  header.mast {
+    border-bottom: 3px double var(--ink);
+    padding-bottom: 14px;
+    margin-bottom: 26px;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+  }
+  .mast h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 44px);
+    letter-spacing: -0.02em;
+    margin: 0; line-height: .95;
+  }
+  .mast .sub {
+    font-family: 'Spline Sans Mono', monospace;
+    font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--muted); margin-top: 6px;
+  }
+  .progress-tag {
+    font-family: 'Spline Sans Mono', monospace;
+    font-size: 12px; letter-spacing: .08em;
+    background: var(--ink); color: var(--paper);
+    padding: 7px 12px; border-radius: 2px; white-space: nowrap;
+  }
+
+  /* Upload */
+  .uploader {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+    padding: 34px;
+    text-align: center;
+    border-radius: 4px;
+  }
+  .uploader h2 {
+    font-family: 'Fraunces', serif; font-weight: 600; margin: 0 0 6px; font-size: 24px;
+  }
+  .uploader p { color: var(--muted); margin: 0 auto 24px; max-width: 540px; }
+  .drop-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 720px; margin: 0 auto; }
+  @media (max-width: 640px){ .drop-row { grid-template-columns: 1fr; } }
+  .drop {
+    border: 1.5px dashed var(--rule);
+    border-radius: 4px; padding: 22px 16px;
+    background: var(--paper);
+    transition: border-color .2s, background .2s; cursor: pointer;
+  }
+  .drop:hover { border-color: var(--accent); background: #fff; }
+  .drop.loaded { border-style: solid; border-color: var(--ok); background: var(--ok-soft); }
+  .drop .lbl { font-family:'Spline Sans Mono',monospace; font-size: 11px; letter-spacing:.16em; text-transform:uppercase; color: var(--muted); }
+  .drop .fn { font-family:'Spline Sans Mono',monospace; font-size: 13px; margin-top: 8px; word-break: break-all; }
+  .drop input { display: none; }
+  .startbtn { margin-top: 26px; }
+
+  /* Buttons */
+  button {
+    font-family: 'Spline Sans Mono', monospace; cursor: pointer; border: none;
+    font-size: 13px; letter-spacing: .06em; transition: transform .08s, background .2s, box-shadow .2s;
+  }
+  button:active { transform: translateY(1px); }
+  .btn {
+    background: var(--ink); color: var(--paper);
+    padding: 13px 26px; border-radius: 2px; text-transform: uppercase; letter-spacing: .12em;
+  }
+  .btn:hover { background: var(--accent); }
+  .btn[disabled] { opacity: .35; cursor: not-allowed; background: var(--muted); }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+  .btn.ghost:hover { background: var(--ink); color: var(--paper); }
+
+  /* Layout split */
+  .split { display: grid; grid-template-columns: 1.55fr 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 900px){ .split { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--rule);
+    box-shadow: var(--shadow); border-radius: 4px; padding: 26px;
+  }
+  .panel.sticky { position: sticky; top: 20px; }
+
+  .kicker {
+    font-family: 'Spline Sans Mono', monospace; font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--accent);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+  }
+  .kicker::after { content:""; flex:1; height:1px; background: var(--rule); }
+
+  .news-title {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 26px; line-height: 1.15;
+    margin: 0 0 14px; letter-spacing: -0.01em;
+  }
+  .news-meta { font-family:'Spline Sans Mono',monospace; font-size: 11px; color: var(--muted); letter-spacing:.05em; margin-bottom: 18px; }
+  .news-desc { font-size: 16.5px; color: #34302a; max-height: 340px; overflow:auto; padding-right: 8px; }
+  .news-desc::-webkit-scrollbar{ width:8px; } .news-desc::-webkit-scrollbar-thumb{ background:var(--rule); border-radius:4px; }
+
+  /* Taxonomy */
+  .tax-search {
+    width:100%; padding:10px 12px; border:1px solid var(--rule); background:var(--paper);
+    font-family:'Spline Sans Mono',monospace; font-size:13px; border-radius:2px; margin-bottom: 14px;
+  }
+  .tax-list { max-height: 60vh; overflow:auto; padding-right:6px; }
+  .tax-list::-webkit-scrollbar{ width:8px; } .tax-list::-webkit-scrollbar-thumb{ background:var(--rule); border-radius:4px; }
+  .tax-cat { margin-bottom: 4px; }
+  .tax-head {
+    width:100%; text-align:left; display:flex; align-items:center; gap:10px;
+    padding:12px 14px; background:var(--paper); border:1px solid transparent; border-radius:3px;
+    font-family:'Fraunces',serif; font-size:16px; font-weight:600; color:var(--ink); letter-spacing:-0.01em;
+  }
+  .tax-head:hover { border-color: var(--rule); }
+  .tax-head.selected { background: var(--ink); color: var(--paper); }
+  .tax-head .chev { font-family:'Spline Sans Mono',monospace; font-size:11px; color:var(--muted); transition:transform .2s; }
+  .tax-head.selected .chev { color: var(--paper); }
+  .tax-head.open .chev { transform: rotate(90deg); }
+  .tax-head .dot {
+    width:9px;height:9px;border-radius:50%;border:1.5px solid var(--muted); flex:0 0 auto;
+  }
+  .tax-head.selected .dot { background: var(--accent-soft); border-color: var(--paper); }
+  .tax-children { display:none; padding:6px 0 10px 34px; }
+  .tax-children.open { display:block; }
+  .tax-child {
+    font-family:'Spline Sans Mono',monospace; font-size:12px; color:var(--muted);
+    padding:3px 0; letter-spacing:.02em;
+  }
+  .tax-child::before { content:"— "; color: var(--rule); }
+
+  /* Comment chain */
+  .chain-title { font-family:'Fraunces',serif; font-weight:600; font-size:22px; margin:0 0 4px; }
+  .chain-note { color: var(--muted); font-size: 15px; margin-bottom: 22px; }
+
+  .ctx-label {
+    font-family:'Spline Sans Mono',monospace; font-size:10px; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--muted); margin:0 0 8px;
+  }
+  .comment {
+    border:1px solid var(--rule); border-radius:4px; padding:16px 18px; margin-bottom:14px; position:relative;
+    background: var(--paper);
+  }
+  .comment.context { opacity:.92; }
+  .comment.top { border-left: 4px solid var(--accent); }
+  .comment.target {
+    background:#fff; border:2px solid var(--ink); box-shadow: 0 10px 30px -22px rgba(40,28,18,.7);
+  }
+  .c-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+  .c-author { font-family:'Spline Sans Mono',monospace; font-size:12px; font-weight:600; letter-spacing:.04em; }
+  .c-badge {
+    font-family:'Spline Sans Mono',monospace; font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+    padding:3px 7px; border-radius:2px;
+  }
+  .c-badge.top { background: var(--accent); color: #fff; }
+  .c-badge.prev { background: var(--paper-2); color: var(--muted); border:1px solid var(--rule); }
+  .c-badge.tgt { background: var(--ink); color: var(--paper); }
+  .c-meta { font-family:'Spline Sans Mono',monospace; font-size:10px; color:var(--muted); margin-left:auto; }
+  .c-text { font-size:17px; white-space:pre-wrap; word-wrap:break-word; }
+  .c-likes { font-family:'Spline Sans Mono',monospace; font-size:11px; color:var(--muted); margin-top:8px; }
+
+  .chain-connector { text-align:center; color:var(--rule); font-size:18px; line-height:1; margin:-6px 0 8px; }
+
+  /* Flag question */
+  .flagbox { margin-top: 26px; border-top: 2px solid var(--ink); padding-top: 22px; }
+  .flagbox h3 { font-family:'Fraunces',serif; font-weight:600; font-size:19px; margin:0 0 4px; }
+  .flagbox p { color:var(--muted); font-size:14px; margin:0 0 16px; }
+  .flag-opts { display:flex; gap:14px; flex-wrap:wrap; }
+  .flag-opt {
+    flex:1; min-width:160px; padding:18px; border:2px solid var(--rule); border-radius:4px;
+    background:var(--paper); text-align:center; transition:all .15s;
+    font-family:'Spline Sans Mono',monospace; font-size:13px; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .flag-opt .big { display:block; font-family:'Fraunces',serif; font-size:30px; font-weight:600; text-transform:none; letter-spacing:0; margin-bottom:6px; }
+  .flag-opt:hover { border-color:var(--ink); }
+  .flag-opt.sel-no { border-color:var(--ok); background:var(--ok-soft); color:var(--ok); }
+  .flag-opt.sel-yes { border-color:var(--danger); background:var(--danger-soft); color:var(--danger); }
+
+  .navrow { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-top:30px; }
+  .navrow .count { font-family:'Spline Sans Mono',monospace; font-size:12px; color:var(--muted); }
+
+  /* Done screen */
+  .done { text-align:center; padding:50px 30px; }
+  .done h2 { font-family:'Fraunces',serif; font-weight:900; font-size:40px; margin:0 0 10px; }
+  .done p { color:var(--muted); max-width:520px; margin:0 auto 26px; }
+
+  .hidden { display:none !important; }
+  .err { color: var(--danger); font-family:'Spline Sans Mono',monospace; font-size:12px; margin-top:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="mast">
+    <div>
+      <h1>The Annotator&rsquo;s Desk</h1>
+      <div class="sub">Comment Moderation &middot; Offensiveness &amp; Topic Coding</div>
+    </div>
+    <div id="progressTag" class="progress-tag hidden">—</div>
+  </header>
+
+  <!-- ============ UPLOAD ============ -->
+  <section id="uploadView">
+    <div class="uploader">
+      <h2>Load a video&rsquo;s files</h2>
+      <p>Drop in the two files for a single video: the comments <code>.csv</code> and the metadata <code>.json</code>. Everything runs locally in your browser.</p>
+      <div class="drop-row">
+        <label class="drop" id="dropCsv">
+          <div class="lbl">Comments CSV</div>
+          <div class="fn" id="csvName">click to choose…</div>
+          <input type="file" id="csvInput" accept=".csv,text/csv">
+        </label>
+        <label class="drop" id="dropJson">
+          <div class="lbl">Metadata JSON</div>
+          <div class="fn" id="jsonName">click to choose…</div>
+          <input type="file" id="jsonInput" accept=".json,application/json">
+        </label>
+      </div>
+      <div style="max-width:340px;margin:26px auto 0;text-align:left;">
+        <label class="lbl" for="annNum" style="display:block;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Annotator number</label>
+        <input type="number" id="annNum" min="1" step="1" placeholder="e.g. 1"
+               style="width:100%;padding:12px 14px;border:1px solid var(--rule);background:var(--paper);font-family:'Spline Sans Mono',monospace;font-size:15px;border-radius:2px;">
+      </div>
+      <div class="startbtn">
+        <button class="btn" id="startBtn" disabled>Begin annotation →</button>
+      </div>
+      <div class="err hidden" id="loadErr"></div>
+    </div>
+  </section>
+
+  <!-- ============ STAGE 1: TOPIC ============ -->
+  <section id="topicView" class="hidden">
+    <div class="split">
+      <div class="panel">
+        <div class="kicker">Stage 1 / The Article</div>
+        <h2 class="news-title" id="newsTitle"></h2>
+        <div class="news-meta" id="newsMeta"></div>
+        <div class="news-desc" id="newsDesc"></div>
+        <div class="navrow">
+          <span class="count" id="topicChosen">No category selected</span>
+          <button class="btn" id="topicNext" disabled>Continue to comments →</button>
+        </div>
+      </div>
+      <div class="panel sticky">
+        <div class="kicker">Topic Taxonomy</div>
+        <input class="tax-search" id="taxSearch" placeholder="filter categories…">
+        <div class="tax-list" id="taxList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STAGE 2: COMMENTS ============ -->
+  <section id="commentView" class="hidden">
+    <div class="panel">
+      <div class="kicker" id="chainKicker">Stage 2 / Comment Chains</div>
+      <h2 class="chain-title">Is the final comment offensive?</h2>
+      <p class="chain-note">Review the chain below. The earlier comments are context; judge only the <strong>highlighted final comment</strong>.</p>
+
+      <div id="chainArea"></div>
+
+      <div class="flagbox">
+        <h3>Flag the final comment</h3>
+        <p>Mark whether the highlighted comment is offensive.</p>
+        <div class="flag-opts">
+          <button class="flag-opt" data-flag="no" id="flagNo"><span class="big">Not offensive</span>safe to keep</button>
+          <button class="flag-opt" data-flag="yes" id="flagYes"><span class="big">Offensive</span>flag it</button>
+        </div>
+      </div>
+
+      <div class="navrow">
+        <button class="btn ghost" id="prevBtn">← Previous</button>
+        <span class="count" id="chainCount"></span>
+        <button class="btn" id="nextBtn" disabled>Next →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DONE ============ -->
+  <section id="doneView" class="hidden">
+    <div class="panel done">
+      <h2>All done.</h2>
+      <p>You annotated the topic of the article and every comment chain. Export your annotations as a JSON file below.</p>
+      <button class="btn" id="exportBtn">Download annotations ⬇</button>
+      <div style="margin-top:18px;">
+        <button class="btn ghost" id="restartBtn">Load another video</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ---------------- Taxonomy ---------------- */
+const TAXONOMY = {
+  "arts, culture, entertainment and media": ["arts and entertainment","culture","mass media"],
+  "crime, law and justice": ["crime","judiciary","justice","law","law enforcement"],
+  "disaster, accident and emergency incident": ["accident and emergency incident","disaster","emergency incident","emergency planning","emergency response"],
+  "economy, business and finance": ["business information","products and services","economy","business enterprise","market and exchange"],
+  "education": ["parents group","religious education","school","social learning","teaching and learning","curriculum","educational testing and examinations","entrance examination","students","teachers","vocational education","educational grading","online and remote learning"],
+  "environment": ["climate change","conservation","environmental pollution","natural resource","nature","sustainability"],
+  "health": ["disease and condition","health facility","health organisation","health treatment and procedure","government health care","health insurance","private health care","medical profession","non-human diseases","public health"],
+  "human interest": ["accomplishment","award and prize","record and achievement","ceremony","people","human mishap","high society","celebrity","anniversary","birthday"],
+  "labour": ["employment","employment legislation","labour market","labour relations","retirement","unemployment","unions"],
+  "lifestyle and leisure": ["leisure","lifestyle","wellness"],
+  "politics and government": ["election","government","government policy","international relations","non-governmental organisation (NGO)","political crisis","political prisoners and dissenters","political process"],
+  "religion": ["belief systems","interreligious dialogue","religious conflict","religious event","religious festival and holiday","religious ritual","religious facility","relations between religion and government","religious leader","religious text"],
+  "science and technology": ["biomedical science","mathematics","natural science","scientific research","scientific institution","social sciences","scientific standards","technology and engineering"],
+  "society": ["fundamental rights","communities","demographics","immigration","emigration","discrimination","family","demographic group","social condition","social problem","values","welfare","diversity, equity and inclusion"],
+  "sport": ["competition discipline","disciplinary action in sport","drug use in sport","sport event","sport industry","sport organisation","sport venue","sports transaction","sport achievement","sports coaching","sports management and ownership","sports officiating"],
+  "conflict, war and peace": ["act of terror","armed conflict","civil unrest","coup d'etat","massacre","peace process","post-war reconstruction","cyber warfare","war victims"],
+  "weather": ["weather forecast","weather phenomena","weather statistic","weather warning"]
+};
+
+/* ---------------- State ---------------- */
+let META = null;
+let COMMENTS = [];        // all rows
+let BY_ID = {};           // comment_id -> row
+let CHAINS = [];          // array of {root, prev, target}
+let csvLoaded = false, jsonLoaded = false;
+let csvFileName = "comments.csv";  // original uploaded comments filename
+let csvHeader = [];                // original column order from the CSV
+let annotatorNumber = null;
+
+let chosenTopic = null;
+let chainIdx = 0;
+let chainFlags = [];      // index -> "yes"|"no"|null
+
+/* ---------------- CSV parser ---------------- */
+function parseCSV(text){
+  const rows = [];
+  let i = 0, field = "", row = [], inQ = false;
+  const pushF = () => { row.push(field); field = ""; };
+  const pushR = () => { rows.push(row); row = []; };
+  // normalize newlines
+  text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  while (i < text.length){
+    const c = text[i];
+    if (inQ){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i += 2; continue; }
+        inQ = false; i++; continue;
+      }
+      field += c; i++; continue;
+    } else {
+      if (c === '"'){ inQ = true; i++; continue; }
+      if (c === ','){ pushF(); i++; continue; }
+      if (c === '\n'){ pushF(); pushR(); i++; continue; }
+      field += c; i++; continue;
+    }
+  }
+  // last field
+  if (field.length > 0 || row.length > 0){ pushF(); pushR(); }
+  // to objects
+  if (!rows.length) return [];
+  const header = rows[0].map(h => h.trim());
+  csvHeader = header.slice();
+  const out = [];
+  for (let r = 1; r < rows.length; r++){
+    if (rows[r].length === 1 && rows[r][0] === "") continue;
+    const o = {};
+    header.forEach((h, idx) => o[h] = rows[r][idx] !== undefined ? rows[r][idx] : "");
+    out.push(o);
+  }
+  return out;
+}
+
+/* ---------------- File loading ---------------- */
+function readFile(file){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = () => rej(new Error("read failed"));
+    fr.readAsText(file);
+  });
+}
+
+const csvInput = document.getElementById('csvInput');
+const jsonInput = document.getElementById('jsonInput');
+
+csvInput.addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const txt = await readFile(f);
+    COMMENTS = parseCSV(txt);
+    csvFileName = f.name || "comments.csv";
+    document.getElementById('csvName').textContent = f.name;
+    document.getElementById('dropCsv').classList.add('loaded');
+    csvLoaded = true;
+  } catch(err){ showLoadErr("Couldn't read the CSV."); }
+  checkReady();
+});
+
+jsonInput.addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const txt = await readFile(f);
+    META = JSON.parse(txt);
+    document.getElementById('jsonName').textContent = f.name;
+    document.getElementById('dropJson').classList.add('loaded');
+    jsonLoaded = true;
+  } catch(err){ showLoadErr("Couldn't parse the JSON."); }
+  checkReady();
+});
+
+function showLoadErr(m){ const e=document.getElementById('loadErr'); e.textContent=m; e.classList.remove('hidden'); }
+function annValid(){ const v = document.getElementById('annNum').value.trim(); return v !== "" && Number.isFinite(Number(v)); }
+function checkReady(){ document.getElementById('startBtn').disabled = !(csvLoaded && jsonLoaded && annValid()); }
+document.getElementById('annNum').addEventListener('input', checkReady);
+
+/* ---------------- Build chains ---------------- */
+function num(v){ const n = parseInt(v,10); return isNaN(n) ? 0 : n; }
+function isReply(r){ return String(r.is_reply).trim().toLowerCase() === 'true'; }
+
+function buildChains(){
+  BY_ID = {};
+  COMMENTS.forEach(r => { BY_ID[r.comment_id] = r; });
+
+  // The real immediate parent: prefer inferred_parent_id (YouTube flattens deep
+  // replies, so parent_comment_id only points at the thread head). Fall back to
+  // parent_comment_id when inferred_parent_id is absent.
+  function parentOf(r){
+    const pid = (r.inferred_parent_id && r.inferred_parent_id.trim())
+      ? r.inferred_parent_id.trim()
+      : (r.parent_comment_id ? r.parent_comment_id.trim() : "");
+    return (pid && BY_ID[pid] && pid !== r.comment_id) ? BY_ID[pid] : null;
+  }
+
+  // Walk immediate-parent links up to the root ancestor (super-parent).
+  function rootOf(r){
+    let cur = r, guard = 0;
+    let p = parentOf(cur);
+    while (p && guard < 1000){ cur = p; p = parentOf(cur); guard++; }
+    return cur;
+  }
+
+  CHAINS = [];
+  COMMENTS.forEach(r => {
+    const prev = parentOf(r);                  // immediate comment it replies to
+    const root = prev ? rootOf(r) : null;      // top-level comments have no root context
+    CHAINS.push({ target: r, prev: prev, root: root });
+  });
+
+  chainFlags = CHAINS.map(() => null);
+}
+
+/* ---------------- Rendering: Topic ---------------- */
+function renderTopic(){
+  document.getElementById('newsTitle').textContent = META.title || "(untitled)";
+  const meta = [];
+  if (META.channel) meta.push(META.channel);
+  if (META.published_at) meta.push(new Date(META.published_at).toLocaleString());
+  if (META.view_count != null) meta.push(Number(META.view_count).toLocaleString() + " views");
+  document.getElementById('newsMeta').textContent = meta.join("  ·  ");
+  document.getElementById('newsDesc').textContent = META.description || "(no description)";
+  renderTaxonomy("");
+}
+
+function renderTaxonomy(filter){
+  const list = document.getElementById('taxList');
+  list.innerHTML = "";
+  const f = filter.trim().toLowerCase();
+  Object.keys(TAXONOMY).forEach(cat => {
+    const children = TAXONOMY[cat];
+    const catMatch = cat.toLowerCase().includes(f);
+    const childMatches = children.filter(c => c.toLowerCase().includes(f));
+    if (f && !catMatch && childMatches.length === 0) return;
+
+    const wrap = document.createElement('div'); wrap.className = 'tax-cat';
+    const head = document.createElement('button');
+    head.className = 'tax-head' + (chosenTopic === cat ? ' selected' : '');
+    head.innerHTML = `<span class="dot"></span><span style="flex:1">${cat}</span><span class="chev">▶</span>`;
+    const kids = document.createElement('div');
+    kids.className = 'tax-children';
+    (f ? childMatches : children).forEach(c => {
+      const d = document.createElement('div'); d.className = 'tax-child'; d.textContent = c; kids.appendChild(d);
+    });
+    if (f) { head.classList.add('open'); kids.classList.add('open'); }
+
+    head.addEventListener('click', () => {
+      const isOpen = kids.classList.contains('open');
+      // toggle expansion
+      if (!f){
+        kids.classList.toggle('open'); head.classList.toggle('open', !isOpen);
+      }
+      // select category
+      chosenTopic = cat;
+      document.querySelectorAll('.tax-head').forEach(h => h.classList.remove('selected'));
+      head.classList.add('selected');
+      document.getElementById('topicChosen').textContent = "Selected: " + cat;
+      document.getElementById('topicNext').disabled = false;
+      // auto-advance to the comments stage after a brief highlight
+      setTimeout(() => { chainIdx = 0; renderChain(); showView('comment'); window.scrollTo({top:0,behavior:'smooth'}); }, 240);
+    });
+    wrap.appendChild(head); wrap.appendChild(kids); list.appendChild(wrap);
+  });
+}
+
+document.getElementById('taxSearch').addEventListener('input', (e) => renderTaxonomy(e.target.value));
+
+/* ---------------- Rendering: Comments ---------------- */
+function commentCard(row, kind){
+  // kind: 'top' | 'prev' | 'target'
+  const div = document.createElement('div');
+  div.className = 'comment ' + (kind === 'target' ? 'target' : (kind === 'top' ? 'top context' : 'context'));
+  const badge = kind === 'top' ? '<span class="c-badge top">Thread root</span>'
+              : kind === 'prev' ? '<span class="c-badge prev">Previous (context)</span>'
+              : '<span class="c-badge tgt">Judge this</span>';
+  const author = row.author_anon || row.author || 'anon';
+  const when = row.published_at ? new Date(row.published_at).toLocaleDateString() : '';
+  div.innerHTML = `
+    <div class="c-head">
+      <span class="c-author">${escapeHtml(author)}</span>
+      ${badge}
+      <span class="c-meta">${when}</span>
+    </div>
+    <div class="c-text">${escapeHtml(row.text || '')}</div>
+    <div class="c-likes">▲ ${num(row.like_count)} likes</div>`;
+  return div;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function renderChain(){
+  const area = document.getElementById('chainArea');
+  area.innerHTML = "";
+  const ch = CHAINS[chainIdx];
+  const t = ch.target;
+
+  // Root of the thread (super-parent) as context — only if distinct from the previous comment.
+  const rootSameAsPrev = ch.root && ch.prev && ch.root.comment_id === ch.prev.comment_id;
+  if (ch.root && !rootSameAsPrev){
+    const lbl = document.createElement('p'); lbl.className='ctx-label'; lbl.textContent='Thread root comment';
+    area.appendChild(lbl);
+    area.appendChild(commentCard(ch.root, 'top'));
+  }
+
+  // Previous comment it replies to. If it equals the root, label it as the root.
+  if (ch.prev){
+    if (ch.root && !rootSameAsPrev){
+      const conn = document.createElement('div'); conn.className='chain-connector'; conn.textContent='⋮'; area.appendChild(conn);
+    }
+    const lbl = document.createElement('p'); lbl.className='ctx-label';
+    lbl.textContent = rootSameAsPrev ? 'Thread root — the comment it replies to' : 'Comment it replies to';
+    area.appendChild(lbl);
+    area.appendChild(commentCard(ch.prev, rootSameAsPrev ? 'top' : 'prev'));
+  }
+
+  // Target
+  const conn2 = document.createElement('div'); conn2.className='chain-connector'; conn2.textContent='⋮'; area.appendChild(conn2);
+  const lbl2 = document.createElement('p'); lbl2.className='ctx-label'; lbl2.textContent='Final comment — judge this';
+  area.appendChild(lbl2);
+  area.appendChild(commentCard(t, 'target'));
+
+  // restore flag UI
+  updateFlagUI();
+  document.getElementById('chainCount').textContent = `Chain ${chainIdx+1} of ${CHAINS.length}`;
+  document.getElementById('prevBtn').disabled = chainIdx === 0;
+  document.getElementById('nextBtn').disabled = chainFlags[chainIdx] === null;
+  updateProgress();
+}
+
+function updateFlagUI(){
+  const fNo = document.getElementById('flagNo'), fYes = document.getElementById('flagYes');
+  fNo.classList.remove('sel-no'); fYes.classList.remove('sel-yes');
+  if (chainFlags[chainIdx] === 'no') fNo.classList.add('sel-no');
+  if (chainFlags[chainIdx] === 'yes') fYes.classList.add('sel-yes');
+}
+
+function advanceChain(){
+  if (chainIdx < CHAINS.length - 1){ chainIdx++; renderChain(); window.scrollTo({top:0,behavior:'smooth'}); }
+  else { showView('done'); }
+}
+
+document.querySelectorAll('.flag-opt').forEach(b => {
+  b.addEventListener('click', () => {
+    chainFlags[chainIdx] = b.dataset.flag;
+    updateFlagUI();
+    document.getElementById('nextBtn').disabled = false;
+    // brief pause so the annotator sees the selection register, then auto-advance
+    setTimeout(advanceChain, 220);
+  });
+});
+
+document.getElementById('nextBtn').addEventListener('click', advanceChain);
+document.getElementById('prevBtn').addEventListener('click', () => {
+  if (chainIdx > 0){ chainIdx--; renderChain(); window.scrollTo({top:0,behavior:'smooth'}); }
+});
+
+/* ---------------- Navigation ---------------- */
+function showView(v){
+  document.getElementById('uploadView').classList.toggle('hidden', v!=='upload');
+  document.getElementById('topicView').classList.toggle('hidden', v!=='topic');
+  document.getElementById('commentView').classList.toggle('hidden', v!=='comment');
+  document.getElementById('doneView').classList.toggle('hidden', v!=='done');
+  document.getElementById('progressTag').classList.toggle('hidden', v==='upload');
+  updateProgress(v);
+}
+
+function updateProgress(v){
+  const tag = document.getElementById('progressTag');
+  const view = v || (document.getElementById('commentView').classList.contains('hidden') ? null : 'comment');
+  if (view === 'topic') tag.textContent = 'Stage 1 · Topic';
+  else if (view === 'done') tag.textContent = 'Complete';
+  else if (!document.getElementById('commentView').classList.contains('hidden')){
+    const done = chainFlags.filter(x => x !== null).length;
+    tag.textContent = `Stage 2 · ${done}/${CHAINS.length} flagged`;
+  }
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  if (!META || !COMMENTS.length){ showLoadErr("Files look empty."); return; }
+  annotatorNumber = document.getElementById('annNum').value.trim();
+  buildChains();
+  renderTopic();
+  showView('topic');
+});
+
+document.getElementById('topicNext').addEventListener('click', () => {
+  chainIdx = 0; renderChain(); showView('comment');
+});
+
+/* ---------------- Export (CSV) ---------------- */
+function csvEscape(v){
+  const s = (v === null || v === undefined) ? "" : String(v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  // Original columns, in their original order, plus two new ones.
+  const baseCols = csvHeader.length
+    ? csvHeader.slice()
+    : Object.keys(COMMENTS[0] || {});
+  const cols = baseCols.concat(['annotator_number', 'label']);
+
+  // label per comment_id from the chain flags (yes -> offensive, no -> not_offensive)
+  const labelById = {};
+  CHAINS.forEach((ch, i) => {
+    const f = chainFlags[i];
+    labelById[ch.target.comment_id] = f === 'yes' ? 'offensive'
+                                    : f === 'no'  ? 'not_offensive'
+                                    : '';
+  });
+
+  const lines = [ cols.map(csvEscape).join(',') ];
+  COMMENTS.forEach(row => {
+    const out = baseCols.map(c => csvEscape(row[c] !== undefined ? row[c] : ''));
+    out.push(csvEscape(annotatorNumber));
+    out.push(csvEscape(labelById[row.comment_id] || ''));
+    lines.push(out.join(','));
+  });
+  const csv = lines.join('\r\n');
+
+  // filename: original comments filename with _<ann_number> before .csv
+  const safeAnn = String(annotatorNumber).replace(/[^A-Za-z0-9_-]/g, '');
+  const base = csvFileName.replace(/\.csv$/i, '');
+  const fname = `${base}_${safeAnn}.csv`;
+
+  const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fname;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('restartBtn').addEventListener('click', () => location.reload());
+
+/* init */
+showView('upload');
+</script>
+</body>
+</html>
