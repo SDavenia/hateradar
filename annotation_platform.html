@@ -321,7 +321,7 @@
   <section id="doneView" class="hidden">
     <div class="panel done">
       <h2>All done.</h2>
-      <p>You annotated the topic of the article and every comment chain. Export your annotations as a JSON file below.</p>
+      <p>You annotated the topic of the article and every comment chain. Export your annotations as a CSV file below.</p>
       <button class="btn" id="exportBtn">Download annotations ⬇</button>
       <div style="margin-top:18px;">
         <button class="btn ghost" id="restartBtn">Load another video</button>
@@ -457,9 +457,6 @@ function buildChains(){
   BY_ID = {};
   COMMENTS.forEach(r => { BY_ID[r.comment_id] = r; });
 
-  // The real immediate parent: prefer inferred_parent_id (YouTube flattens deep
-  // replies, so parent_comment_id only points at the thread head). Fall back to
-  // parent_comment_id when inferred_parent_id is absent.
   function parentOf(r){
     const pid = (r.inferred_parent_id && r.inferred_parent_id.trim())
       ? r.inferred_parent_id.trim()
@@ -467,7 +464,6 @@ function buildChains(){
     return (pid && BY_ID[pid] && pid !== r.comment_id) ? BY_ID[pid] : null;
   }
 
-  // Walk immediate-parent links up to the root ancestor (super-parent).
   function rootOf(r){
     let cur = r, guard = 0;
     let p = parentOf(cur);
@@ -477,8 +473,8 @@ function buildChains(){
 
   CHAINS = [];
   COMMENTS.forEach(r => {
-    const prev = parentOf(r);                  // immediate comment it replies to
-    const root = prev ? rootOf(r) : null;      // top-level comments have no root context
+    const prev = parentOf(r);
+    const root = prev ? rootOf(r) : null;
     CHAINS.push({ target: r, prev: prev, root: root });
   });
 
@@ -520,18 +516,14 @@ function renderTaxonomy(filter){
 
     head.addEventListener('click', () => {
       const isOpen = kids.classList.contains('open');
-      // toggle expansion
       if (!f){
         kids.classList.toggle('open'); head.classList.toggle('open', !isOpen);
       }
-      // select category
       chosenTopic = cat;
       document.querySelectorAll('.tax-head').forEach(h => h.classList.remove('selected'));
       head.classList.add('selected');
       document.getElementById('topicChosen').textContent = "Selected: " + cat;
       document.getElementById('topicNext').disabled = false;
-      // auto-advance to the comments stage after a brief highlight
-      setTimeout(() => { chainIdx = 0; renderChain(); showView('comment'); window.scrollTo({top:0,behavior:'smooth'}); }, 240);
     });
     wrap.appendChild(head); wrap.appendChild(kids); list.appendChild(wrap);
   });
@@ -541,7 +533,6 @@ document.getElementById('taxSearch').addEventListener('input', (e) => renderTaxo
 
 /* ---------------- Rendering: Comments ---------------- */
 function commentCard(row, kind){
-  // kind: 'top' | 'prev' | 'target'
   const div = document.createElement('div');
   div.className = 'comment ' + (kind === 'target' ? 'target' : (kind === 'top' ? 'top context' : 'context'));
   const badge = kind === 'top' ? '<span class="c-badge top">Thread root</span>'
@@ -570,7 +561,6 @@ function renderChain(){
   const ch = CHAINS[chainIdx];
   const t = ch.target;
 
-  // Root of the thread (super-parent) as context — only if distinct from the previous comment.
   const rootSameAsPrev = ch.root && ch.prev && ch.root.comment_id === ch.prev.comment_id;
   if (ch.root && !rootSameAsPrev){
     const lbl = document.createElement('p'); lbl.className='ctx-label'; lbl.textContent='Thread root comment';
@@ -578,7 +568,6 @@ function renderChain(){
     area.appendChild(commentCard(ch.root, 'top'));
   }
 
-  // Previous comment it replies to. If it equals the root, label it as the root.
   if (ch.prev){
     if (ch.root && !rootSameAsPrev){
       const conn = document.createElement('div'); conn.className='chain-connector'; conn.textContent='⋮'; area.appendChild(conn);
@@ -589,13 +578,11 @@ function renderChain(){
     area.appendChild(commentCard(ch.prev, rootSameAsPrev ? 'top' : 'prev'));
   }
 
-  // Target
   const conn2 = document.createElement('div'); conn2.className='chain-connector'; conn2.textContent='⋮'; area.appendChild(conn2);
   const lbl2 = document.createElement('p'); lbl2.className='ctx-label'; lbl2.textContent='Final comment — judge this';
   area.appendChild(lbl2);
   area.appendChild(commentCard(t, 'target'));
 
-  // restore flag UI
   updateFlagUI();
   document.getElementById('chainCount').textContent = `Chain ${chainIdx+1} of ${CHAINS.length}`;
   document.getElementById('prevBtn').disabled = chainIdx === 0;
@@ -620,7 +607,6 @@ document.querySelectorAll('.flag-opt').forEach(b => {
     chainFlags[chainIdx] = b.dataset.flag;
     updateFlagUI();
     document.getElementById('nextBtn').disabled = false;
-    // brief pause so the annotator sees the selection register, then auto-advance
     setTimeout(advanceChain, 220);
   });
 });
@@ -663,48 +649,54 @@ document.getElementById('topicNext').addEventListener('click', () => {
   chainIdx = 0; renderChain(); showView('comment');
 });
 
-/* ---------------- Export (CSV) ---------------- */
+/* ---------------- Export ---------------- */
 function csvEscape(v){
   const s = (v === null || v === undefined) ? "" : String(v);
   return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
+function triggerDownload(blob, fname){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fname; a.click();
+  URL.revokeObjectURL(url);
+}
+
 document.getElementById('exportBtn').addEventListener('click', () => {
-  // Original columns, in their original order, plus two new ones.
+  const safeAnn = String(annotatorNumber).replace(/[^A-Za-z0-9_-]/g, '');
+  const baseName = csvFileName.replace(/\.csv$/i, '');
+
+  // --- 1. Comments CSV: original columns + annotator_number + label ---
   const baseCols = csvHeader.length
     ? csvHeader.slice()
     : Object.keys(COMMENTS[0] || {});
   const cols = baseCols.concat(['annotator_number', 'label']);
 
-  // label per comment_id from the chain flags (yes -> offensive, no -> not_offensive)
+  // label per comment_id: 1 = offensive, 0 = not offensive
   const labelById = {};
   CHAINS.forEach((ch, i) => {
     const f = chainFlags[i];
-    labelById[ch.target.comment_id] = f === 'yes' ? 'offensive'
-                                    : f === 'no'  ? 'not_offensive'
-                                    : '';
+    labelById[ch.target.comment_id] = f === 'yes' ? '1' : f === 'no' ? '0' : '';
   });
 
   const lines = [ cols.map(csvEscape).join(',') ];
   COMMENTS.forEach(row => {
     const out = baseCols.map(c => csvEscape(row[c] !== undefined ? row[c] : ''));
     out.push(csvEscape(annotatorNumber));
-    out.push(csvEscape(labelById[row.comment_id] || ''));
+    out.push(csvEscape(labelById[row.comment_id] !== undefined ? labelById[row.comment_id] : ''));
     lines.push(out.join(','));
   });
-  const csv = lines.join('\r\n');
+  const csvBlob = new Blob(['\ufeff' + lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+  triggerDownload(csvBlob, `${baseName}.csv`);
 
-  // filename: original comments filename with _<ann_number> before .csv
-  const safeAnn = String(annotatorNumber).replace(/[^A-Za-z0-9_-]/g, '');
-  const fname = `csvFileName`;
-
-  const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fname;
-  a.click();
-  URL.revokeObjectURL(url);
+  // --- 2. Metadata JSON: original META fields + annotator_number + topic ---
+  const enrichedMeta = Object.assign({}, META, {
+    annotator_number: annotatorNumber,
+    topic: chosenTopic || ''
+  });
+  const jsonBlob = new Blob([JSON.stringify(enrichedMeta, null, 2)], {type:'application/json'});
+  // small delay so browsers don't block the second download
+  setTimeout(() => triggerDownload(jsonBlob, `${baseName}.json`), 300);
 });
 
 document.getElementById('restartBtn').addEventListener('click', () => location.reload());
