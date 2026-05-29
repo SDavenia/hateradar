@@ -225,6 +225,7 @@
   .done { text-align:center; padding:50px 30px; }
   .done h2 { font-family:'Fraunces',serif; font-weight:900; font-size:40px; margin:0 0 10px; }
   .done p { color:var(--muted); max-width:520px; margin:0 auto 26px; }
+  .done-btns { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
 
   .hidden { display:none !important; }
   .err { color: var(--danger); font-family:'Spline Sans Mono',monospace; font-size:12px; margin-top:14px; }
@@ -321,8 +322,11 @@
   <section id="doneView" class="hidden">
     <div class="panel done">
       <h2>All done.</h2>
-      <p>You annotated the topic of the article and every comment chain. Export your annotations as a CSV file below.</p>
-      <button class="btn" id="exportBtn">Download annotations ⬇</button>
+      <p>You annotated the topic of the article and every comment chain. Export your annotations below — download both files.</p>
+      <div class="done-btns">
+        <button class="btn" id="exportCsvBtn">Download annotations CSV ⬇</button>
+        <button class="btn" id="exportJsonBtn">Download metadata JSON ⬇</button>
+      </div>
       <div style="margin-top:18px;">
         <button class="btn ghost" id="restartBtn">Load another video</button>
       </div>
@@ -649,7 +653,7 @@ document.getElementById('topicNext').addEventListener('click', () => {
   chainIdx = 0; renderChain(); showView('comment');
 });
 
-/* ---------------- Export ---------------- */
+/* ---------------- Export helpers ---------------- */
 function csvEscape(v){
   const s = (v === null || v === undefined) ? "" : String(v);
   return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -662,22 +666,23 @@ function triggerDownload(blob, fname){
   URL.revokeObjectURL(url);
 }
 
-document.getElementById('exportBtn').addEventListener('click', () => {
-  const safeAnn = String(annotatorNumber).replace(/[^A-Za-z0-9_-]/g, '');
-  const baseName = csvFileName.replace(/\.csv$/i, '');
-
-  // --- 1. Comments CSV: original columns + annotator_number + label ---
-  const baseCols = csvHeader.length
-    ? csvHeader.slice()
-    : Object.keys(COMMENTS[0] || {});
-  const cols = baseCols.concat(['annotator_number', 'label']);
-
-  // label per comment_id: 1 = offensive, 0 = not offensive
+function buildLabelById(){
   const labelById = {};
   CHAINS.forEach((ch, i) => {
     const f = chainFlags[i];
     labelById[ch.target.comment_id] = f === 'yes' ? '1' : f === 'no' ? '0' : '';
   });
+  return labelById;
+}
+
+/* ---------------- Export: CSV ---------------- */
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  const baseName = csvFileName.replace(/\.csv$/i, '');
+  const baseCols = csvHeader.length
+    ? csvHeader.slice()
+    : Object.keys(COMMENTS[0] || {});
+  const cols = baseCols.concat(['annotator_number', 'label']);
+  const labelById = buildLabelById();
 
   const lines = [ cols.map(csvEscape).join(',') ];
   COMMENTS.forEach(row => {
@@ -688,15 +693,17 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   });
   const csvBlob = new Blob(['\ufeff' + lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
   triggerDownload(csvBlob, `${baseName}.csv`);
+});
 
-  // --- 2. Metadata JSON: original META fields + annotator_number + topic ---
+/* ---------------- Export: JSON ---------------- */
+document.getElementById('exportJsonBtn').addEventListener('click', () => {
+  const baseName = csvFileName.replace(/\.csv$/i, '');
   const enrichedMeta = Object.assign({}, META, {
     annotator_number: annotatorNumber,
     topic: chosenTopic || ''
   });
   const jsonBlob = new Blob([JSON.stringify(enrichedMeta, null, 2)], {type:'application/json'});
-  // small delay so browsers don't block the second download
-  setTimeout(() => triggerDownload(jsonBlob, `${baseName}.json`), 300);
+  triggerDownload(jsonBlob, `${baseName}.json`);
 });
 
 document.getElementById('restartBtn').addEventListener('click', () => location.reload());
