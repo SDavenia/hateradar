@@ -17,3 +17,8 @@ old
 
 # Fake data for testing while annotation is underway
 Annotators_workload_fake
+
+# Python and cache
+__pycache__
+*.pyc
+.DS_Store
