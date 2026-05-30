@@ -12,3 +12,5 @@ Marem, 19 Maggio
 
 ---
 
+## Valutazione
+F1 sulla classe positiva
