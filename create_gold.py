@@ -14,7 +14,7 @@ from statsmodels.stats.inter_rater import fleiss_kappa
 import numpy as np
 import krippendorff
 
-use_fake_data = True # Only now for testing
+use_fake_data = False # Only now for testing
 
 
 input_dir = "Annotators_workload_fake" if use_fake_data else "Annotators_workload"
@@ -43,14 +43,32 @@ for annotator in annotators:
                     files_annotators_paths[file_id] = []
                 files_annotators_paths[file_id].append((input_file_path, newspaper))  # ← store newspaper
 
-assert all(len(paths) == 3 for paths in files_annotators_paths.values()), "Not all files have 3 annotations!"
+from collections import Counter
+
+bad = {fid: paths for fid, paths in files_annotators_paths.items() if len(paths) != 3}
+if bad:
+    print(f"{len(bad)} file(s) do NOT have exactly 3 annotations:\n")
+    for fid, paths in sorted(bad.items()):
+        # which annotator each path came from (annotator is the 2nd path segment)
+        anns = [p.split(os.sep)[1] for p, _ in paths]
+        dupes = [a for a, c in Counter(anns).items() if c > 1]
+        print(f"  {fid}: {len(paths)} annotation(s) from {anns}"
+              + (f"  ⚠ duplicate annotator(s): {dupes}" if dupes else ""))
+    raise AssertionError("Not all files have 3 annotations!")
+
 annotator_full_labels = {ann: [] for ann in annotators}
 
 for file_id, paths in files_annotators_paths.items():
     paths_only = [p for p, _ in paths]                         # ← unpack
     newspaper = paths[0][1]                                    # ← recover newspaper
     file_annotators = [p.split("/")[1] for p in paths_only]
-    dfs = [pd.read_csv(p) for p in paths_only]
+    dfs = []
+    for p in paths_only:
+        try:
+            dfs.append(pd.read_csv(p))
+        except pd.errors.ParserError as e:
+            print(f"PARSE ERROR in: {p}\n   {e}")
+            raise
 
     for annotator in file_annotators:
         annotator_full_labels[annotator].extend(dfs[file_annotators.index(annotator)]["label"].tolist())
