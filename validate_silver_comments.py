@@ -12,6 +12,8 @@ import json
 import gc
 import re
 
+from dotenv import load_dotenv
+
 import torch
 import pandas as pd
 from dataclasses import dataclass, field
@@ -31,7 +33,7 @@ from sklearn.metrics import classification_report, f1_score
 # Config
 # --------------------------------------------------------------------------- #
 
-BATCH_SIZE = 8          # per-batch generation size; 8-16 is safe for 24-32B in bf16
+BATCH_SIZE = 32          # per-batch generation size; 8-16 is safe for 24-32B in bf16
 MAX_LENGTH = 4096       # truncation ceiling for the tokenized prompt
 
 ANNOTATION_PROMPT = """
@@ -181,17 +183,17 @@ REGISTRY = {
         Gemma3ForConditionalGeneration, AutoProcessor,
         is_vlm=True, supports_system_role=True,
     ),
-    "qwen_vl": ModelSpec(
-        "Qwen/Qwen2.5-VL-32B-Instruct",
-        Qwen2_5_VLForConditionalGeneration, AutoProcessor,
-        is_vlm=True, supports_system_role=True,
-    ),
-    "anita": ModelSpec(
-        "m-polignano/ANITA-NEXT-24B-Magistral-2506-VISION-ITA",
-        AutoModelForVision2Seq, AutoProcessor,
-        is_vlm=True, supports_system_role=True,
-        max_new_tokens=1024,                         # thinking model: room to reason
-    ),
+    # "qwen_vl": ModelSpec( -> DID NOT MANAGE TO ISNTALL TORCHVISION
+    #     "Qwen/Qwen2.5-VL-32B-Instruct",
+    #     Qwen2_5_VLForConditionalGeneration, AutoProcessor,
+    #     is_vlm=True, supports_system_role=True,
+    # ),
+    # "anita": ModelSpec(
+    #     "m-polignano/ANITA-NEXT-24B-Magistral-2506-VISION-ITA",
+    #     AutoModelForVision2Seq, AutoProcessor,
+    #     is_vlm=True, supports_system_role=True,
+    #     max_new_tokens=1024,                         # thinking model: room to reason
+    # ),
 }
 
 GLOBAL_LOAD_KWARGS = dict(
@@ -337,7 +339,8 @@ def load_model(spec: ModelSpec):
     proc = spec.proc_class.from_pretrained(spec.name)
 
     load_kwargs = {**GLOBAL_LOAD_KWARGS, **spec.load_kwargs}   # spec wins on conflict
-    model = spec.model_class.from_pretrained(spec.name, **load_kwargs)
+    HF_TOKEN = os.getenv("HF_TOKEN")
+    model = spec.model_class.from_pretrained(spec.name, token=HF_TOKEN,**load_kwargs)
     model.eval()
 
     # For a VLM the real tokenizer is proc.tokenizer; for a text model proc IS it.
@@ -463,6 +466,7 @@ def run_one_model(key: str, prompts: list, labels: list, batch_size: int = BATCH
     released before the next model loads (finally => freed even on error)."""
     spec = REGISTRY[key]
     model, proc = load_model(spec)
+    print(f"Running with model: {key} ({spec.name})")
     try:
         preds = run_inference(model, proc, spec, prompts, batch_size=batch_size, test=test)
     finally:
@@ -522,8 +526,10 @@ def select_and_evaluate(dev_df, test_df, model_keys, batch_size: int = BATCH_SIZ
 # --------------------------------------------------------------------------- #
 
 def main():
+    load_dotenv()  # for Hugging Face API keys, if needed
+    
     gold_df = load_gold_data(use_fake_data=True)   # flip to False for the real run
-    gold_df.to_csv("try.csv", index=False)         # kept for inspection; no longer halts
+    # gold_df.to_csv("try.csv", index=False)         # keep for inspection
 
     # TODO: For small testing runs
     test = True
@@ -531,6 +537,7 @@ def main():
         gold_df = gold_df.sample(50, random_state=42).reset_index(drop=True)
 
     dev_df, test_df = make_dev_test_split(gold_df)
+    print(f"Correctly split into dev and test set")
     select_and_evaluate(dev_df, test_df, model_keys=list(REGISTRY), batch_size=BATCH_SIZE, test=test)
 
 
