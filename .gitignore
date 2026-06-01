@@ -13,7 +13,8 @@ try*
 
 # Old data
 VideosComments_old
-old
+old*
+gold_metadata.csv
 
 # Fake data for testing while annotation is underway
 Annotators_workload_fake
