@@ -25,3 +25,7 @@ __pycache__
 *.pyc
 .DS_Store
 *.DS_Store
+
+# Sbatch files
+sbatch_run/
+sbatch_output/

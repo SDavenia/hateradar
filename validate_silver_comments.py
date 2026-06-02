@@ -3,8 +3,6 @@
 # 1. Load gold annotated data (+ build per-comment context and prompt).
 # 2. Split gold data 60/40 into dev/test (stratified on label x depth).
 # 3. Select best model on the 60% dev split, report final metrics on the 40% test split.
-#
-# Nothing is trained: the 60% is a model-SELECTION split, hence "dev" not "train".
 ####
 
 import os
@@ -33,8 +31,8 @@ from sklearn.metrics import classification_report, f1_score
 # Config
 # --------------------------------------------------------------------------- #
 
-BATCH_SIZE = 32          # per-batch generation size; 8-16 is safe for 24-32B in bf16
-MAX_LENGTH = 4096       # truncation ceiling for the tokenized prompt
+BATCH_SIZE = 8         # per-batch generation size; 8-16 is safe for 24-32B in bf16
+MAX_LENGTH = 4096        # truncation ceiling for the tokenized prompt
 
 ANNOTATION_PROMPT = """
 Sei un annotatore esperto nel riconoscimento di linguaggio offensivo nei commenti online in italiano.
@@ -168,11 +166,6 @@ class ModelSpec:
 # Explicit classes per model card (more robust than the version-dependent
 # Auto* umbrellas). Add quantization etc. via a single model's load_kwargs.
 REGISTRY = {
-    "mistral": ModelSpec(
-        "mistralai/Mistral-Small-24B-Instruct-2501",
-        AutoModelForCausalLM, AutoTokenizer,
-        is_vlm=False, supports_system_role=True,
-    ),
     "gemma2": ModelSpec(
         "google/gemma-2-27b-it",
         AutoModelForCausalLM, AutoTokenizer,
@@ -183,6 +176,11 @@ REGISTRY = {
         Gemma3ForConditionalGeneration, AutoProcessor,
         is_vlm=True, supports_system_role=True,
     ),
+    "mistral": ModelSpec(
+        "mistralai/Mistral-Small-24B-Instruct-2501",
+        AutoModelForCausalLM, AutoTokenizer,
+        is_vlm=False, supports_system_role=True,
+    ),
     # "qwen_vl": ModelSpec( -> DID NOT MANAGE TO ISNTALL TORCHVISION
     #     "Qwen/Qwen2.5-VL-32B-Instruct",
     #     Qwen2_5_VLForConditionalGeneration, AutoProcessor,
@@ -192,7 +190,7 @@ REGISTRY = {
     #     "m-polignano/ANITA-NEXT-24B-Magistral-2506-VISION-ITA",
     #     AutoModelForVision2Seq, AutoProcessor,
     #     is_vlm=True, supports_system_role=True,
-    #     max_new_tokens=1024,                         # thinking model: room to reason
+    #     max_new_tokens=1024,                         
     # ),
 }
 
@@ -526,13 +524,11 @@ def select_and_evaluate(dev_df, test_df, model_keys, batch_size: int = BATCH_SIZ
 # --------------------------------------------------------------------------- #
 
 def main():
-    load_dotenv()  # for Hugging Face API keys, if needed
-    
-    gold_df = load_gold_data(use_fake_data=True)   # flip to False for the real run
-    # gold_df.to_csv("try.csv", index=False)         # keep for inspection
+    load_dotenv()  
+    gold_df = load_gold_data(use_fake_data=False)   # flip to False for the real run
 
     # TODO: For small testing runs
-    test = True
+    test = False
     if test:
         gold_df = gold_df.sample(50, random_state=42).reset_index(drop=True)
 

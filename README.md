@@ -33,13 +33,14 @@ Code to scrape Youtube videos and reconstruct the full comment threads.
 Code to aggregated annotations to produce `_gold` files which are placed in `annotated_comments, annotated_metadata` folders with `_gold` suffix.
 
 2. `validate_silver_comments.py, validate_silver_metadata.py`
-Code to use the gold data to select the best model on both offensiveness classification and topic classification. The best model is selected on a dev split consisting of 60\% of gold videos and performance is reported on a held-out 40\% test set.
+Code to use the gold data to select the best model on offensiveness classification and topic classification. 
+The best model is selected on a dev split consisting of 60\% of gold videos and performance is reported on a held-out 40\% test set.
 
 3. `create_silver_comments.py, create_silver_metadata.py`
 Code to infer silver labels for both offensive classification (at the comment level) and topic classification (at the news article level).
 
-4. `prepare_hateradar_data.py`
+4. `prepare_offensiveradar_data.py`
 Code to collect all gold and silver data and place them in a single `.csv` file containing `video_id, newspaper, text, topic, percentage_offensive_comments, type`, with one entry per video.
 
-5. `hateradar.py`
+5. `offensiveradar.py`
 Code to run zero-shot classification on the Offensive-Radar Detection task.

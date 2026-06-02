@@ -150,7 +150,7 @@ TAXONOMY_BLOCK = _format_taxonomy(TAXONOMY)
 # Config
 # --------------------------------------------------------------------------- #
 
-BATCH_SIZE = 32          # per-batch generation size; 8-16 is safe for 24-32B in bf16
+BATCH_SIZE = 8          # per-batch generation size; 8-16 is safe for 24-32B in bf16
 MAX_LENGTH = 4096        # truncation ceiling for the tokenized prompt
 
 ANNOTATION_PROMPT = """

@@ -3,10 +3,6 @@
 # 1. Load gold-annotated article metadata (title + description + gold `topic`).
 # 2. Split gold data 60/40 into dev/test (stratified on topic).
 # 3. Select best model on the 60% dev split, report final metrics on the 40% test split.
-#
-# Nothing is trained: the 60% is a model-SELECTION split, hence "dev" not "train".
-# Each article is read from the annotated_metadata folder; the gold label is the
-# value of the "topic" field, mapped to one of the 17 top-level taxonomy categories.
 ####
 
 import os
@@ -142,7 +138,7 @@ TAXONOMY_BLOCK = _format_taxonomy(TAXONOMY)
 # Config
 # --------------------------------------------------------------------------- #
 
-BATCH_SIZE = 32          # per-batch generation size; 8-16 is safe for 24-32B in bf16
+BATCH_SIZE = 8          # per-batch generation size; 8-16 is safe for 24-32B in bf16
 MAX_LENGTH = 4096       # truncation ceiling for the tokenized prompt
 
 ANNOTATION_PROMPT = """
@@ -578,11 +574,11 @@ def select_and_evaluate(dev_df, test_df, model_keys, batch_size: int = BATCH_SIZ
 def main():
     load_dotenv()  # for Hugging Face API keys, if needed
 
-    gold_df = load_gold_data(use_fake_data=True)   # flip to False for the real run
+    gold_df = load_gold_data(use_fake_data=False)   # flip to False for the real run
     # gold_df.to_csv("try.csv", index=False)         # keep for inspection
 
     # TODO: For small testing runs
-    test = True
+    test = False
     if test:
         n = min(50, len(gold_df))
         gold_df = gold_df.sample(n, random_state=42).reset_index(drop=True)
