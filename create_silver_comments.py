@@ -410,14 +410,97 @@ def run_inference(model, proc, spec: ModelSpec, prompts: list,
 # Silver annotation
 # --------------------------------------------------------------------------- #
 
+# def annotate_silver(model, proc, spec: ModelSpec,
+#                     comments_dir: str, metadata_dir: str, annotated_dir: str,
+#                     batch_size: int = BATCH_SIZE, overwrite: bool = False):
+#     """
+#     Walk every raw comment file. Skip the ones that already have a gold file;
+#     label the rest with the loaded model and write <id>_silver.csv next to gold.
+#     """
+#     n_skipped_gold = n_skipped_silver = n_written = n_errors = 0
+
+#     for newspaper in newspapers:
+#         comments_np = os.path.join(comments_dir, newspaper)
+#         metadata_np = os.path.join(metadata_dir, newspaper)
+#         annotated_np = os.path.join(annotated_dir, newspaper)
+
+#         if not os.path.isdir(comments_np):
+#             print(f"WARNING: no comments dir for '{newspaper}' ({comments_np}) — skipping")
+#             continue
+#         os.makedirs(annotated_np, exist_ok=True)
+
+#         for filename in sorted(os.listdir(comments_np)):
+#             # Only raw comment files: plain <id>.csv, never *_gold/_silver.csv.
+#             if not filename.endswith(".csv"):
+#                 continue
+#             if filename.endswith("_gold.csv") or filename.endswith("_silver.csv"):
+#                 continue
+
+#             file_id = filename[:-4]                      # strip ".csv"
+#             gold_path = os.path.join(annotated_np, f"{file_id}_gold.csv")
+#             silver_path = os.path.join(annotated_np, f"{file_id}_silver.csv")
+
+#             if os.path.exists(gold_path):
+#                 n_skipped_gold += 1
+#                 continue                                 # human-annotated already
+#             if os.path.exists(silver_path) and not overwrite:
+#                 n_skipped_silver += 1
+#                 continue                                 # resume: already done
+
+#             print(f"\n[{newspaper}/{file_id}] annotating...")
+#             try:
+#                 df = pd.read_csv(os.path.join(comments_np, filename))
+#                 if df.empty:
+#                     df["label"] = []
+#                     df.to_csv(silver_path, index=False)
+#                     continue
+
+#                 # Columns to persist = raw schema + the new `label` (no leftover label col).
+#                 out_cols = [c for c in df.columns.tolist() if c != "label"] + ["label"]
+
+#                 video_title, video_description = load_metadata(
+#                     os.path.join(metadata_np, f"{file_id}.json")
+#                 )
+#                 df = prepare_df(df, video_title, video_description, newspaper)
+
+#                 preds = run_inference(
+#                     model, proc, spec, df["annotation_prompt"].tolist(),
+#                     batch_size=batch_size,
+#                 )
+#                 df["label"] = preds
+
+#                 n_none = sum(p is None for p in preds)
+#                 if n_none:
+#                     print(f"  {n_none}/{len(preds)} unparseable — written as empty label")
+
+#                 df[out_cols].to_csv(silver_path, index=False)
+#                 print(f"  -> {silver_path}  ({len(df)} comments)")
+#                 n_written += 1
+#             except Exception as e:
+#                 n_errors += 1
+#                 print(f"  ERROR on {newspaper}/{file_id}: {e}")
+
+#     print(f"\n{'='*60}")
+#     print(f"Done. silver written: {n_written} | "
+#           f"skipped (gold): {n_skipped_gold} | "
+#           f"skipped (existing silver): {n_skipped_silver} | "
+#           f"errors: {n_errors}")
+#     print(f"{'='*60}")
+
+
 def annotate_silver(model, proc, spec: ModelSpec,
                     comments_dir: str, metadata_dir: str, annotated_dir: str,
                     batch_size: int = BATCH_SIZE, overwrite: bool = False):
     """
-    Walk every raw comment file. Skip the ones that already have a gold file;
-    label the rest with the loaded model and write <id>_silver.csv next to gold.
+    Pool every comment across every file into ONE batched inference run, so that
+    a 1-comment file no longer wastes a whole batch. Predictions are scattered
+    back to each file afterwards via the [start:end] slice it occupies.
     """
-    n_skipped_gold = n_skipped_silver = n_written = n_errors = 0
+    n_skipped_gold = n_skipped_silver = n_skipped_empty = n_written = n_errors = 0
+
+    # ---- Pass 1: collect work ------------------------------------------------ #
+    jobs = []          # one entry per file we will actually annotate
+    all_prompts = []   # flat list of every prompt across every file
 
     for newspaper in newspapers:
         comments_np = os.path.join(comments_dir, newspaper)
@@ -430,63 +513,98 @@ def annotate_silver(model, proc, spec: ModelSpec,
         os.makedirs(annotated_np, exist_ok=True)
 
         for filename in sorted(os.listdir(comments_np)):
-            # Only raw comment files: plain <id>.csv, never *_gold/_silver.csv.
             if not filename.endswith(".csv"):
                 continue
             if filename.endswith("_gold.csv") or filename.endswith("_silver.csv"):
                 continue
 
-            file_id = filename[:-4]                      # strip ".csv"
+            file_id = filename[:-4]
             gold_path = os.path.join(annotated_np, f"{file_id}_gold.csv")
             silver_path = os.path.join(annotated_np, f"{file_id}_silver.csv")
 
             if os.path.exists(gold_path):
                 n_skipped_gold += 1
-                continue                                 # human-annotated already
+                continue
             if os.path.exists(silver_path) and not overwrite:
                 n_skipped_silver += 1
-                continue                                 # resume: already done
+                continue
 
-            print(f"\n[{newspaper}/{file_id}] annotating...")
+            comment_path = os.path.join(comments_np, filename)
             try:
-                df = pd.read_csv(os.path.join(comments_np, filename))
-                if df.empty:
-                    df["label"] = []
-                    df.to_csv(silver_path, index=False)
-                    continue
+                df = pd.read_csv(comment_path)
+            except pd.errors.EmptyDataError:
+                print(f"[{newspaper}/{file_id}] empty file (no header/rows) — ignoring")
+                n_skipped_empty += 1
+                continue
 
-                # Columns to persist = raw schema + the new `label` (no leftover label col).
+            if df.empty:
+                print(f"[{newspaper}/{file_id}] no comments — ignoring")
+                n_skipped_empty += 1
+                continue
+
+            # Per-file prep is wrapped so one bad file doesn't abort collection.
+            try:
                 out_cols = [c for c in df.columns.tolist() if c != "label"] + ["label"]
-
                 video_title, video_description = load_metadata(
                     os.path.join(metadata_np, f"{file_id}.json")
                 )
                 df = prepare_df(df, video_title, video_description, newspaper)
-
-                preds = run_inference(
-                    model, proc, spec, df["annotation_prompt"].tolist(),
-                    batch_size=batch_size,
-                )
-                df["label"] = preds
-
-                n_none = sum(p is None for p in preds)
-                if n_none:
-                    print(f"  {n_none}/{len(preds)} unparseable — written as empty label")
-
-                df[out_cols].to_csv(silver_path, index=False)
-                print(f"  -> {silver_path}  ({len(df)} comments)")
-                n_written += 1
+                prompts = df["annotation_prompt"].tolist()
             except Exception as e:
                 n_errors += 1
-                print(f"  ERROR on {newspaper}/{file_id}: {e}")
+                print(f"  ERROR preparing {newspaper}/{file_id}: {e}")
+                continue
+
+            start = len(all_prompts)
+            all_prompts.extend(prompts)
+            jobs.append({
+                "newspaper": newspaper,
+                "file_id": file_id,
+                "df": df,
+                "out_cols": out_cols,
+                "silver_path": silver_path,
+                "start": start,
+                "end": start + len(prompts),
+            })
+
+    if not all_prompts:
+        print("Nothing to annotate.")
+        print(f"skipped (gold): {n_skipped_gold} | "
+              f"skipped (existing silver): {n_skipped_silver} | "
+              f"skipped (empty): {n_skipped_empty} | errors: {n_errors}")
+        return
+
+    # ---- Pass 2: ONE batched inference over the whole pool ------------------- #
+    print(f"\nAnnotating {len(all_prompts)} comments across {len(jobs)} files "
+          f"in batches of {batch_size}...")
+    all_preds = run_inference(model, proc, spec, all_prompts, batch_size=batch_size)
+
+    # ---- Pass 3: scatter predictions back + write --------------------------- #
+    for job in jobs:
+        df = job["df"]
+        preds = all_preds[job["start"]:job["end"]]
+        df["label"] = preds
+
+        n_none = sum(p is None for p in preds)
+        if n_none:
+            print(f"  [{job['newspaper']}/{job['file_id']}] "
+                  f"{n_none}/{len(preds)} unparseable — written as empty label")
+
+        try:
+            df[job["out_cols"]].to_csv(job["silver_path"], index=False)
+            print(f"  -> {job['silver_path']}  ({len(df)} comments)")
+            n_written += 1
+        except Exception as e:
+            n_errors += 1
+            print(f"  ERROR writing {job['newspaper']}/{job['file_id']}: {e}")
 
     print(f"\n{'='*60}")
     print(f"Done. silver written: {n_written} | "
           f"skipped (gold): {n_skipped_gold} | "
           f"skipped (existing silver): {n_skipped_silver} | "
+          f"skipped (empty): {n_skipped_empty} | "
           f"errors: {n_errors}")
     print(f"{'='*60}")
-
 
 # --------------------------------------------------------------------------- #
 # Main
