@@ -7,7 +7,7 @@
 #
 # Output: one CSV row per video with columns
 #   video_id, newspaper, video_text, video_description, video_topic,
-#   num_comments, num_offensive_comments, offensive_score, offensive_trigger
+#   num_comments, num_offensive_comments, offensive_score, offensive_trigger, type
 #
 # Conventions (matching the rest of the pipeline):
 #   - gold wins over silver when both files exist for the same id/source.
@@ -18,6 +18,10 @@
 #                          offensive comments. Denominator n = ALL comments
 #                          (unparseable/empty labels stay in n, not in n_off).
 #   - offensive_trigger  = 1 if offensive_score > 0.7, else 0.
+#   - type               = "gold" or "silver" from the file suffix; if the
+#                          metadata and comments suffixes disagree for a video,
+#                          it is recorded as "<meta>/<comments>" and a warning
+#                          is printed.
 #
 # Comment files with no rows (including completely empty files) are still
 # included as a video with num_comments = 0 -> offensive_score = 0.0.
@@ -42,6 +46,7 @@ newspapers = [
 OUTPUT_COLUMNS = [
     "video_id", "newspaper", "video_text", "video_description", "video_topic",
     "num_comments", "num_offensive_comments", "offensive_score", "offensive_trigger",
+    "type",
 ]
 
 OFFENSIVE_THRESHOLD = 0.7
@@ -124,6 +129,18 @@ def read_comment_stats(comm_path: str):
     return num_comments, n_offensive
 
 
+def resolve_type(meta_type, comm_type, newspaper, file_id):
+    """Single gold/silver tag from the two source suffixes; flag disagreements."""
+    present = [t for t in (meta_type, comm_type) if t is not None]
+    if not present:
+        return ""
+    if len(set(present)) == 1:
+        return present[0]
+    print(f"  WARNING: {newspaper}/{file_id} has mismatched sources "
+          f"(metadata={meta_type}, comments={comm_type}) — recorded as combined")
+    return f"{meta_type}/{comm_type}"
+
+
 def build_dataset(annotated_metadata_dir: str, annotated_comments_dir: str) -> pd.DataFrame:
     rows = []
     n_no_meta = n_no_comments = 0
@@ -139,8 +156,9 @@ def build_dataset(annotated_metadata_dir: str, annotated_comments_dir: str) -> p
 
         for file_id in all_ids:
             title, description, topic = "", "", ""
+            meta_type = comm_type = None
             if file_id in meta_idx:
-                meta_path, _ = meta_idx[file_id]
+                meta_path, meta_type = meta_idx[file_id]
                 try:
                     title, description, topic = read_meta(meta_path)
                 except Exception as e:
@@ -152,7 +170,7 @@ def build_dataset(annotated_metadata_dir: str, annotated_comments_dir: str) -> p
 
             num_comments, n_offensive = 0, 0
             if file_id in comm_idx:
-                comm_path, _ = comm_idx[file_id]
+                comm_path, comm_type = comm_idx[file_id]
                 try:
                     num_comments, n_offensive = read_comment_stats(comm_path)
                 except Exception as e:
@@ -174,6 +192,7 @@ def build_dataset(annotated_metadata_dir: str, annotated_comments_dir: str) -> p
                 "num_offensive_comments": n_offensive,
                 "offensive_score": round(score, 4),
                 "offensive_trigger": 1 if score > OFFENSIVE_THRESHOLD else 0,
+                "type": resolve_type(meta_type, comm_type, newspaper, file_id),
             })
 
     df = pd.DataFrame(rows, columns=OUTPUT_COLUMNS)
@@ -213,6 +232,7 @@ def main():
         print(f"  total comments: {int(df['num_comments'].sum())}")
         print(f"  total offensive comments: {int(df['num_offensive_comments'].sum())}")
         print(f"  mean offensive_score: {df['offensive_score'].mean():.4f}")
+        print(f"  by type: {df['type'].value_counts().to_dict()}")
     print(f"{'='*60}")
 
 
