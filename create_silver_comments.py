@@ -533,15 +533,22 @@ def annotate_silver(model, proc, spec: ModelSpec,
             try:
                 df = pd.read_csv(comment_path)
             except pd.errors.EmptyDataError:
-                print(f"[{newspaper}/{file_id}] empty file (no header/rows) — ignoring")
+                # Truly empty input (0 bytes, no header): no schema to mirror,
+                # so we emit a silver file with just the `label` column.
+                print(f"[{newspaper}/{file_id}] empty file (no header/rows) — writing empty silver")
+                pd.DataFrame(columns=["label"]).to_csv(silver_path, index=False)
                 n_skipped_empty += 1
                 continue
 
             if df.empty:
-                print(f"[{newspaper}/{file_id}] no comments — ignoring")
+                # Header present but no comment rows: mirror the schema + label.
+                print(f"[{newspaper}/{file_id}] no comments — writing empty silver")
+                out_cols = [c for c in df.columns.tolist() if c != "label"] + ["label"]
+                df["label"] = pd.Series(dtype=object)
+                df[out_cols].to_csv(silver_path, index=False)
                 n_skipped_empty += 1
                 continue
-
+            
             # Per-file prep is wrapped so one bad file doesn't abort collection.
             try:
                 out_cols = [c for c in df.columns.tolist() if c != "label"] + ["label"]
