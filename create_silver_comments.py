@@ -634,7 +634,7 @@ def main():
     args = parse_args()
 
     base = "VideosComments_fake" if args.use_fake_data else "VideosComments"
-    comments_dir = f"{base}/youtube/comments"
+    comments_dir = f"{base}/youtube/anonymized_comments"
     metadata_dir = f"{base}/youtube/metadata"
     annotated_dir = f"{base}/youtube/annotated_comments"
 

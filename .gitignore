@@ -2,6 +2,8 @@
 view.ipynb
 find_subreddits.ipynb
 reddit_scraper_test.ipynb
+baselines.ipynb
+prepare_results.ipynb
 
 # Tests
 test_articles.csv
@@ -19,6 +21,11 @@ gold_metadata.csv
 # Fake data for testing while annotation is underway
 Annotators_workload_fake
 VideosComments_fake
+VideosComments_new
+
+# Results files
+results
+results_baselines
 
 # Python and cache
 __pycache__
@@ -29,3 +36,6 @@ __pycache__
 # Sbatch files
 sbatch_run/
 sbatch_output/
+
+# Shell
+*.sh
