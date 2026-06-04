@@ -1,0 +1,18 @@
+Model:   gemma2
+Prompt:  0
+Label:   offensive_trigger (taken directly from the dataset)
+Videos evaluated:        500
+Unparseable (excluded):  0
+Label distribution:      triggering (1): 250 | non-triggering (0): 250
+
+                     precision    recall  f1-score   support
+
+non-triggering (No)     0.6957    0.6400    0.6667       250
+    triggering (Si)     0.6667    0.7200    0.6923       250
+
+           accuracy                         0.6800       500
+          macro avg     0.6812    0.6800    0.6795       500
+       weighted avg     0.6812    0.6800    0.6795       500
+
+
+Macro-averaged -> precision: 0.6812 | recall: 0.6800 | f1: 0.6795

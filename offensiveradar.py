@@ -1,19 +1,5 @@
 ####
 # Offensiveness-TRIGGERING prediction from video metadata (zero-shot).
-#
-# Input : the per-video dataset built earlier (video_dataset.csv) with columns
-#         id, newspaper, text, topic, num_comments, percentage_offensive_comments, type
-#
-# Ground truth: a video is "offensiveness triggering" (label 1) iff
-#         percentage_offensive_comments > tau            (tau on the 0-100 scale)
-#
-# Task  : given ONLY the video title + description, each model/prompt predicts
-#         whether the video will trigger offensive comments (Sì / No).
-#
-# Output: results/<model>/prompt_<id>.csv   -> per-video predictions
-#         results/<model>/prompt_<id>.txt   -> precision/recall/F1 per class + macro
-#
-# The model-loading / inference machinery is reused from the silver-annotation script.
 ####
 
 import os
@@ -41,8 +27,12 @@ from sklearn.metrics import classification_report, precision_recall_fscore_suppo
 # Config
 # --------------------------------------------------------------------------- #
 
-BATCH_SIZE = 32          # per-batch generation size; 8-16 is safe for 24-32B in bf16
+BATCH_SIZE = 8          # per-batch generation size; 8-16 is safe for 24-32B in bf16
 MAX_LENGTH = 4096        # truncation ceiling for the tokenized prompt
+
+# Columns the pipeline relies on. `offensive_trigger` is the binary ground
+# truth label (1 = the video triggers offensive comments, 0 = it does not).
+REQUIRED_COLUMNS = ["video_text", "video_description", "offensive_trigger"]
 
 
 # Five distinct Italian prompts for the SAME task: predict, from title +
@@ -53,16 +43,20 @@ PROMPTS = [
     # 0 — minimal / direct
     """Sei un sistema automatico di moderazione di una piattaforma di notizie online.
 
-Dato il TITOLO e la DESCRIZIONE di un video di notizie, il tuo compito è prevedere se la sezione commenti del video conterrà linguaggio offensivo (insulti, aggressività, odio, discriminazione, ecc.).
+Dato il titolo e la descrizione di un video, devi prevedere se la discussione generata attirerà una quantità significativa di commenti offensivi.
 
-TITOLO DEL VIDEO:
+Per commenti offensivi si intendono insulti, aggressioni verbali, linguaggio d'odio, discriminazione, denigrazione o attacchi verso persone o gruppi.
+
+TITOLO:
 {video_title}
 
-DESCRIZIONE DEL VIDEO:
+DESCRIZIONE:
 {video_description}
 
-Il video genererà commenti offensivi?
-Rispondi ESCLUSIVAMENTE con una sola parola: "Sì" oppure "No".
+Questo video attirerà una quantità significativa di commenti offensivi?
+
+Rispondi esclusivamente con una sola parola:
+"Sì" oppure "No".
 """,
 
     # 1 — definition-rich
@@ -84,25 +78,7 @@ Rispondi solo con "Sì" (attirerà commenti offensivi) oppure "No" (non li attir
 """,
 
     # 2 — analyst persona, polarization focus
-    """Agisci come un analista di dinamiche social specializzato nella polarizzazione del dibattito pubblico italiano.
-
-Ti vengono forniti il titolo e la descrizione di un video di notizie. Valuta se l'argomento e il modo in cui è presentato sono tali da scatenare reazioni ostili o offensive nei commenti (es. temi politici controversi, immigrazione, religione, cronaca nera, attriti sociali).
-
-TITOLO: {video_title}
-DESCRIZIONE: {video_description}
-
-Questo video tenderà a scatenare commenti offensivi?
-Output: una sola etichetta, "Sì" oppure "No".
-""",
-
-    # 3 — guided reasoning, final answer only
-    """Sei un moderatore esperto. Devi prevedere se un video di notizie provocherà commenti offensivi, basandoti solo su titolo e descrizione.
-
-Valuta mentalmente questi fattori, SENZA scriverli:
-- L'argomento è divisivo o conflittuale?
-- Tocca gruppi spesso bersaglio di odio (etnia, religione, genere, orientamento, politica)?
-- Il tono è provocatorio o sensazionalistico?
-- Suscita forti emozioni (rabbia, indignazione)?
+    """Immagina la sezione commenti di questo video di notizie.
 
 TITOLO:
 {video_title}
@@ -110,21 +86,56 @@ TITOLO:
 DESCRIZIONE:
 {video_description}
 
-Dopo aver considerato questi fattori, fornisci SOLO la risposta finale: "Sì" se è probabile che generi commenti offensivi, "No" altrimenti. Non scrivere il ragionamento.
+Valuta se è probabile che la discussione contenga numerosi commenti offensivi, aggressivi, denigratori o ostili verso persone, gruppi o istituzioni.
+
+Non considerare la semplice presenza occasionale di qualche insulto: valuta se l'offensività sarà una componente rilevante della discussione.
+
+Rispondi esclusivamente con:
+"Sì" oppure "No".
 """,
 
-    # 4 — audience-reaction imagination
-    """Immagina la sezione commenti di questo video di notizie su una piattaforma italiana.
+    # 3 — guided reasoning, final answer only
+    """Sei un moderatore professionista di contenuti online.
 
-TITOLO DEL VIDEO:
+Il tuo compito è prevedere se un video di notizie genererà una discussione con una quantità rilevante di commenti offensivi.
+
+Valuta mentalmente:
+- il livello di conflittualità del tema;
+- il potenziale di indignazione pubblica;
+- la presenza di gruppi frequentemente bersaglio di ostilità;
+- la probabilità di scontri verbali tra utenti.
+
+TITOLO:
 {video_title}
 
-DESCRIZIONE DEL VIDEO:
+DESCRIZIONE:
 {video_description}
 
-In base al titolo e alla descrizione, pensi che tra i commenti compariranno messaggi offensivi, aggressivi o irrispettosi verso persone o gruppi?
+Rispondi soltanto con:
+"Sì" oppure "No".""",
 
-Rispondi soltanto "Sì" oppure "No".
+    # 4 — audience-reaction imagination
+    """Sei un sistema di previsione del rischio di offensività nelle discussioni online.
+
+Utilizzando esclusivamente il titolo e la descrizione del video, stima se la conversazione che seguirà presenterà un livello elevato di commenti offensivi.
+
+Per livello elevato si intende una presenza consistente di:
+- insulti;
+- aggressività verbale;
+- linguaggio d'odio;
+- discriminazione;
+- attacchi personali o verso gruppi sociali.
+
+TITOLO:
+{video_title}
+
+DESCRIZIONE:
+{video_description}
+
+Output consentito:
+"Sì"
+oppure
+"No"
 """,
 ]
 
@@ -182,41 +193,45 @@ GLOBAL_LOAD_KWARGS = dict(
 # Data preparation
 # --------------------------------------------------------------------------- #
 
-def split_title_description(text):
-    """The dataset's `text` column is title + '\\n\\n' + description. Recover the
-    two parts (split on the first blank line). Falls back to N/A when missing."""
-    if not isinstance(text, str) or not text.strip():
-        return "N/A", "N/A"
-    parts = text.split("\n\n", 1)
-    title = parts[0].strip() or "N/A"
-    description = parts[1].strip() if len(parts) > 1 and parts[1].strip() else "N/A"
-    return title, description
-
-
-def load_dataset(input_path: str, tau: float, type_filter: str = "all"):
-    """Read the per-video CSV, optionally filter by gold/silver, derive the binary
-    `true_label` (percentage_offensive_comments > tau), drop videos with no
-    percentage (no comments -> undefined ground truth)."""
+def load_dataset(input_path: str, type_filter: str = "all"):
+    """Read the per-video CSV, optionally filter by gold/silver, and use the
+    dataset's `offensive_trigger` column directly as the binary ground truth.
+    Title/description come from the dedicated `video_text` / `video_description`
+    columns. Videos whose label is missing (undefined ground truth) are dropped."""
     df = pd.read_csv(input_path)
+
+    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
+    if missing:
+        raise KeyError(
+            f"Dataset is missing required column(s): {missing}. "
+            f"Found columns: {list(df.columns)}"
+        )
 
     if type_filter != "all":
         before = len(df)
         df = df[df["type"].astype(str) == type_filter].copy()
         print(f"Type filter '{type_filter}': {len(df)}/{before} videos kept")
 
-    pct = pd.to_numeric(df["percentage_offensive_comments"], errors="coerce")
-    n_dropped = int(pct.isna().sum())
+    # Label comes straight from the dataset now (no tau / percentage thresholding).
+    label = pd.to_numeric(df["offensive_trigger"], errors="coerce")
+    n_dropped = int(label.isna().sum())
     if n_dropped:
-        print(f"Dropping {n_dropped} videos with no percentage (no comments) — undefined label")
-    df = df[pct.notna()].copy()
-    pct = pct[pct.notna()]
+        print(f"Dropping {n_dropped} videos with no offensive_trigger label — undefined ground truth")
+    df = df[label.notna()].copy()
+    df["true_label"] = pd.to_numeric(df["offensive_trigger"], errors="coerce").astype(int)
 
-    df["true_label"] = (pct > tau).astype(int)
-    df["__title"], df["__description"] = zip(*df["text"].map(split_title_description))
+    # Title and description live in dedicated columns (no more text-splitting).
+    # Empty / missing fields fall back to "N/A" so a prompt slot is never blank.
+    df["__title"] = (
+        df["video_text"].fillna("N/A").astype(str).str.strip().replace("", "N/A")
+    )
+    df["__description"] = (
+        df["video_description"].fillna("N/A").astype(str).str.strip().replace("", "N/A")
+    )
 
     n_pos = int(df["true_label"].sum())
     print(f"Loaded {len(df)} videos | triggering (label 1): {n_pos} | "
-          f"non-triggering (label 0): {len(df) - n_pos} | tau={tau}")
+          f"non-triggering (label 0): {len(df) - n_pos}")
     return df.reset_index(drop=True)
 
 
@@ -331,15 +346,18 @@ TARGET_NAMES = ["non-triggering (No)", "triggering (Si)"]
 
 
 def write_outputs(out_dir: str, model_key: str, prompt_id: int,
-                  df: pd.DataFrame, preds: list, tau: float):
-    """Write results/<model>/prompt_<id>.csv (predictions) and .txt (metrics)."""
+                  df: pd.DataFrame, preds: list):
+    """Write results/<model>/prompt_<id>.csv (every input column + prediction)
+    and .txt (metrics)."""
     model_dir = os.path.join(out_dir, model_key)
     os.makedirs(model_dir, exist_ok=True)
     csv_path = os.path.join(model_dir, f"prompt_{prompt_id}.csv")
     txt_path = os.path.join(model_dir, f"prompt_{prompt_id}.txt")
 
-    # --- predictions CSV (keeps unparseable rows, pred_label left empty) ---
-    out_df = df[["id", "newspaper", "text", "percentage_offensive_comments", "true_label"]].copy()
+    # --- predictions CSV: keep ALL original dataset columns and just append the
+    #     model prediction. Drop only the internal prompt-rendering helpers,
+    #     whose content is already preserved in video_text / video_description. ---
+    out_df = df.drop(columns=["__title", "__description"], errors="ignore").copy()
     out_df["pred_label"] = preds
     out_df.to_csv(csv_path, index=False)
 
@@ -347,13 +365,15 @@ def write_outputs(out_dir: str, model_key: str, prompt_id: int,
     pairs = [(t, p) for t, p in zip(df["true_label"].tolist(), preds) if p is not None]
     n_total = len(preds)
     n_unparseable = n_total - len(pairs)
+    n_pos = int(df["true_label"].sum())
 
     lines = [
         f"Model:   {model_key}",
         f"Prompt:  {prompt_id}",
-        f"tau:     {tau}  (label 1 iff percentage_offensive_comments > tau)",
+        f"Label:   offensive_trigger (taken directly from the dataset)",
         f"Videos evaluated:        {n_total}",
         f"Unparseable (excluded):  {n_unparseable}",
+        f"Label distribution:      triggering (1): {n_pos} | non-triggering (0): {n_total - n_pos}",
         "",
     ]
 
@@ -386,10 +406,8 @@ def write_outputs(out_dir: str, model_key: str, prompt_id: int,
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Predict offensiveness-triggering videos with multiple LLMs and prompts.")
-    ap.add_argument("--tau", type=float, required=True,
-                    help="Threshold on percentage_offensive_comments (0-100). label 1 iff value > tau.")
     ap.add_argument("--input", default="video_dataset.csv",
-                    help="Per-video dataset CSV from the previous script.")
+                    help="Per-video dataset CSV (must contain video_text, video_description, offensive_trigger).")
     ap.add_argument("--out-dir", default="results",
                     help="Root output directory (default: results).")
     ap.add_argument("--models", nargs="+", choices=list(REGISTRY), default=list(REGISTRY),
@@ -404,7 +422,7 @@ def main():
     load_dotenv()  # for Hugging Face API keys, if needed
     args = parse_args()
 
-    df = load_dataset(args.input, tau=args.tau, type_filter=args.type)
+    df = load_dataset(args.input, type_filter=args.type)
     if df.empty:
         print("No videos to evaluate — aborting.")
         return
@@ -424,7 +442,7 @@ def main():
             for prompt_id, prompts in enumerate(prompt_sets):
                 print(f"\n[{model_key}] prompt {prompt_id}")
                 preds = run_inference(model, proc, spec, prompts, batch_size=args.batch_size)
-                write_outputs(args.out_dir, model_key, prompt_id, df, preds, args.tau)
+                write_outputs(args.out_dir, model_key, prompt_id, df, preds)
         finally:
             del model, proc
             gc.collect()

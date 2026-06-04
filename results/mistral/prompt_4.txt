@@ -1,0 +1,18 @@
+Model:   mistral
+Prompt:  4
+Label:   offensive_trigger (taken directly from the dataset)
+Videos evaluated:        500
+Unparseable (excluded):  0
+Label distribution:      triggering (1): 250 | non-triggering (0): 250
+
+                     precision    recall  f1-score   support
+
+non-triggering (No)     0.5619    0.8720    0.6834       250
+    triggering (Si)     0.7143    0.3200    0.4420       250
+
+           accuracy                         0.5960       500
+          macro avg     0.6381    0.5960    0.5627       500
+       weighted avg     0.6381    0.5960    0.5627       500
+
+
+Macro-averaged -> precision: 0.6381 | recall: 0.5960 | f1: 0.5627
