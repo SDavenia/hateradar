@@ -39,3 +39,6 @@ sbatch_output/
 
 # Shell
 *.sh
+
+# Datasets
+datasets/

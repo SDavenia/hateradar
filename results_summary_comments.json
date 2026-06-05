@@ -1,7 +1,0 @@
-{
-  "best_model": "gemma2",
-  "dev_f1_offensive": 0.6616161616161617,
-  "test_f1_offensive": 0.6434108527131783,
-  "dev_report": "               precision    recall  f1-score   support\n\nnon-offensive     0.9662    0.6116    0.7491       327\n    offensive     0.5078    0.9493    0.6616       138\n\n     accuracy                         0.7118       465\n    macro avg     0.7370    0.7804    0.7053       465\n weighted avg     0.8301    0.7118    0.7231       465\n",
-  "test_report": "               precision    recall  f1-score   support\n\nnon-offensive     0.9379    0.6210    0.7473       219\n    offensive     0.5000    0.9022    0.6434        92\n\n     accuracy                         0.7042       311\n    macro avg     0.7190    0.7616    0.6953       311\n weighted avg     0.8084    0.7042    0.7165       311\n"
-}
